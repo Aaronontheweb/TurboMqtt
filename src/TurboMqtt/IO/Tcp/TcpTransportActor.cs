@@ -120,7 +120,8 @@ internal sealed class TcpTransportActor : UntypedActor
     private readonly TaskCompletionSource<DisconnectReasonCode> _whenTerminated = new();
     private readonly ILoggingAdapter _log = Context.GetLogger();
 
-    private readonly Pipe _pipe;
+    private readonly Pipe _appToTransport;
+    private readonly Pipe _transportToApp;
 
     public TcpTransportActor(MqttClientTcpOptions tcpOptions)
     {
@@ -130,7 +131,7 @@ internal sealed class TcpTransportActor : UntypedActor
         State = new ConnectionState(_writesToTransport.Writer, _readsFromTransport.Reader, _whenTerminated.Task,
             MaxFrameSize, _writesToTransport.Reader.Completion); // we signal completion when _writesToTransport is done
 
-        _pipe = new Pipe(new PipeOptions(pauseWriterThreshold: ScaleBufferSize(MaxFrameSize), resumeWriterThreshold: ScaleBufferSize(MaxFrameSize) / 2,
+        _transportToApp = new Pipe(new PipeOptions(pauseWriterThreshold: ScaleBufferSize(MaxFrameSize), resumeWriterThreshold: ScaleBufferSize(MaxFrameSize) / 2,
             useSynchronizationContext: false));
     }
 
@@ -371,7 +372,7 @@ internal sealed class TcpTransportActor : UntypedActor
     {
         while (!ct.IsCancellationRequested)
         {
-            var memory = _pipe.Writer.GetMemory(TcpOptions.MaxFrameSize / 4);
+            var memory = _transportToApp.Writer.GetMemory(TcpOptions.MaxFrameSize / 4);
             try
             {
                 int bytesRead = await _tcpClient!.ReceiveAsync(memory, SocketFlags.None, ct);
@@ -384,7 +385,7 @@ internal sealed class TcpTransportActor : UntypedActor
                     return;
                 }
 
-                _pipe.Writer.Advance(bytesRead);
+                _transportToApp.Writer.Advance(bytesRead);
             }
             catch (OperationCanceledException)
             {
@@ -404,7 +405,7 @@ internal sealed class TcpTransportActor : UntypedActor
             }
 
             // make data available to PipeReader
-            var result = await _pipe.Writer.FlushAsync(ct);
+            var result = await _transportToApp.Writer.FlushAsync(ct);
             if (result.IsCompleted)
             {
                 _closureSelf.Tell(ReadFinished.Instance);
@@ -412,7 +413,7 @@ internal sealed class TcpTransportActor : UntypedActor
             }
         }
 
-        await _pipe.Writer.CompleteAsync();
+        await _transportToApp.Writer.CompleteAsync();
     }
 
     private async Task ReadFromPipeAsync(CancellationToken ct)
@@ -421,7 +422,7 @@ internal sealed class TcpTransportActor : UntypedActor
         {
             try
             {
-                var result = await _pipe.Reader.ReadAsync(ct);
+                var result = await _transportToApp.Reader.ReadAsync(ct);
                 var buffer = result.Buffer;
 
                 // consume this entire sequence by copying it into a new buffer
@@ -433,7 +434,7 @@ internal sealed class TcpTransportActor : UntypedActor
                 _readsFromTransport.Writer.TryWrite((unshared, newMemory.Length));
 
                 // tell the pipe we're done with this data
-                _pipe.Reader.AdvanceTo(buffer.End);
+                _transportToApp.Reader.AdvanceTo(buffer.End);
 
                 if (result.IsCompleted)
                 {
@@ -513,8 +514,8 @@ internal sealed class TcpTransportActor : UntypedActor
             // stop reading from the socket
             State.ShutDownCts.Cancel();
 
-            _pipe.Reader.Complete();
-            _pipe.Writer.Complete();
+            _transportToApp.Reader.Complete();
+            _transportToApp.Writer.Complete();
             _tcpClient?.Close();
             _tcpClient?.Dispose();
         }
