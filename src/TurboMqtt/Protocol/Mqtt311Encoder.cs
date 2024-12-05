@@ -37,6 +37,11 @@ public static class Mqtt311Encoder
     /// <returns>The length of actual bytes encoded</returns>
     public static int EncodePacket(MqttPacket packet, ref Memory<byte> buffer, PacketSize estimatedSize)
     {
+        if (buffer.Length < estimatedSize.TotalSize)
+        {
+            throw new ArgumentException("Buffer is too small for the estimated packet size.");
+        }
+        
         switch (packet.PacketType)
         {
             case MqttPacketType.Publish:
