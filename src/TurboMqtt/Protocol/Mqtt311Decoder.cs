@@ -20,7 +20,7 @@ public class Mqtt311Decoder
 
     public bool TryDecode(in ReadOnlyMemory<byte> additionalData, out ImmutableList<MqttPacket> packets)
     {
-        packets = ImmutableList<MqttPacket>.Empty;
+        packets = [];
         var rValue = false;
 
         ReadOnlyMemory<byte> workingBuffer = additionalData;
