@@ -19,11 +19,9 @@ foreach ($line in $($publishOutput -split "`r`n"))
 $osPlatform = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
 if ($osPlatform -match "Windows") {
     $osFolder = "win-x64"
-} elseif ($osPlatform -match "Linux") {
-    $osFolder = "linux-x64"
 } else {
-    Write-Error "Unsupported OS: $osPlatform. Only Windows and Linux are supported."
-    Exit 1
+    $osFolder = "linux-x64"
+    # Default to linux
 }
 
 $testAppPath = Join-Path -Path $rootDirectory/tests/TurboMqtt.AotCompatibility.TestApp/bin/Release/$targetNetFramework -ChildPath $osFolder
