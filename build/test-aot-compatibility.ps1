@@ -1,4 +1,4 @@
-param([string]$targetNetFramework)
+param([string]$targetNetFramework = "net8.0")
 
 $rootDirectory = Split-Path $PSScriptRoot -Parent
 $publishOutput = dotnet publish $rootDirectory/tests/TurboMqtt.AotCompatibility.TestApp/TurboMqtt.AotCompatibility.TestApp.csproj -nodeReuse:false /p:UseSharedCompilation=false /p:ExposeExperimentalFeatures=true
@@ -15,7 +15,25 @@ foreach ($line in $($publishOutput -split "`r`n"))
     }
 }
 
-pushd $rootDirectory/tests/TurboMqtt.AotCompatibility.TestApp/bin/Release/$targetNetFramework/linux-x64
+# Determine the OS-specific folder
+$osPlatform = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+if ($osPlatform -match "Windows") {
+    $osFolder = "win-x64"
+} elseif ($osPlatform -match "Linux") {
+    $osFolder = "linux-x64"
+} else {
+    Write-Error "Unsupported OS. Only Windows and Linux are supported."
+    Exit 1
+}
+
+$testAppPath = Join-Path -Path $rootDirectory/tests/TurboMqtt.AotCompatibility.TestApp/bin/Release/$targetNetFramework -ChildPath $osFolder
+
+if (-Not (Test-Path $testAppPath)) {
+    Write-Error "Test App path does not exist: $testAppPath"
+    Exit 1
+}
+
+pushd $testAppPath
 
 Write-Host "Executing test App..."
 ./TurboMqtt.AotCompatibility.TestApp
@@ -35,7 +53,7 @@ $testPassed = 0
 if ($actualWarningCount -ne $expectedWarningCount)
 {
     $testPassed = 1
-    Write-Host "Actual warning count:", actualWarningCount, "is not as expected. Expected warning count is:", $expectedWarningCount
+    Write-Host "Actual warning count:", $actualWarningCount, "is not as expected. Expected warning count is:", $expectedWarningCount
 }
 
 Exit $testPassed
