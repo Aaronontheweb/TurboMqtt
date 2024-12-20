@@ -22,7 +22,7 @@ if ($osPlatform -match "Windows") {
 } elseif ($osPlatform -match "Linux") {
     $osFolder = "linux-x64"
 } else {
-    Write-Error "Unsupported OS. Only Windows and Linux are supported."
+    Write-Error "Unsupported OS: $osPlatform. Only Windows and Linux are supported."
     Exit 1
 }
 
