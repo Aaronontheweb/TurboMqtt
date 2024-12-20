@@ -1,13 +1,13 @@
 ﻿using Akka.Actor;
-using TurboMqtt.Core;
-using TurboMqtt.Core.Client;
+using TurboMqtt;
+using TurboMqtt.Client;
 
 var actorSystem = ActorSystem.Create("AotTestSystem");
 var clientFactory = new MqttClientFactory(actorSystem);
 
 var inMemoryClient =
     await clientFactory.CreateInMemoryClient(new MqttClientConnectOptions("test-client",
-        TurboMqtt.Core.Protocol.MqttProtocolVersion.V3_1_1));
+        TurboMqtt.Protocol.MqttProtocolVersion.V3_1_1));
         
 var connectResult = await inMemoryClient.ConnectAsync(CancellationToken.None);
 
